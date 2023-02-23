@@ -23,7 +23,7 @@ const adminController = {
     const { name, tel, address, openingHours, description, categoryId } = req.body
     if (!name) throw new Error('Restaurant name is required!')
     const { file } = req
-    imgurFileHandler(file)
+    return imgurFileHandler(file)
       .then(filePath => Restaurant.create({
         name,
         tel,
@@ -33,7 +33,6 @@ const adminController = {
         image: filePath || null,
         categoryId
       }))
-
       .then(() => {
         req.flash('success_messages', 'restaurant was successfully created!')
         res.redirect('/admin/restaurants')
@@ -58,16 +57,16 @@ const adminController = {
       Category.findAll({ raw: true })
     ])
       .then(([restaurant, categories]) => {
-        if (!restaurant) throw new Error("Restaurant didn't exist!")
+        if (!restaurant) throw new Error("Restaurant doesn't exist!")
         res.render('admin/edit-restaurant', { restaurant, categories })
       })
       .catch(err => next(err))
   },
   putRestaurant: (req, res, next) => {
-    const { name, tel, address, openingHours, description } = req.body
+    const { name, tel, address, openingHours, description, categoryId } = req.body
     if (!name) throw new Error('Restaurant name is required!')
     const { file } = req
-    Promise.all([
+    return Promise.all([
       Restaurant.findByPk(req.params.id),
       imgurFileHandler(file)
     ])
@@ -79,7 +78,8 @@ const adminController = {
           address,
           openingHours,
           description,
-          image: filePath || restaurant.image
+          image: filePath || restaurant.image,
+          categoryId
         })
       })
       .then(() => {
