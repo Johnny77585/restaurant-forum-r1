@@ -1,5 +1,7 @@
 const { Restaurant, Category, Comment, User } = require('../models')
 const { getOffset, getPagination } = require('../helpers/pagination-helper')
+const { Sequelize } = require('sequelize')
+const sequelize = new Sequelize('sqlite::memory:')
 const restaurantController = {
   getRestaurants: (req, res, next) => {
     const DEFAULT_LIMIT = 9
@@ -7,6 +9,7 @@ const restaurantController = {
     const page = Number(req.query.page) || 1
     const limit = Number(req.query.limit) || DEFAULT_LIMIT
     const offset = getOffset(limit, page)
+
     return Promise.all([
       Restaurant.findAndCountAll({
         include: Category,
@@ -95,6 +98,43 @@ const restaurantController = {
         res.render('feeds', {
           restaurants,
           comments
+        })
+      })
+      .catch(err => next(err))
+  },
+  getTopRestaurants: (req, res, next) => {
+    return Restaurant.findAll({
+      attributes: {
+        include: [
+          [
+            sequelize.literal(`(
+                    SELECT COUNT(*)
+                    FROM favorites AS FavoritedUsers
+                    WHERE
+                        FavoritedUsers.restaurant_id = restaurant.id
+                )`),
+            'favoritedCount'
+          ]
+        ]
+      },
+      order: [
+        [sequelize.literal('favoritedCount'), 'DESC']
+      ],
+      include: [{
+        model: User, as: 'FavoritedUsers'
+      }]
+    })
+      .then(restaurants => {
+        const data = restaurants.map(r => ({
+          ...r.toJSON(),
+          favoritedCount: r.FavoritedUsers.length,
+          description: r.description.substring(0, 50),
+          isFavorited: req.user && req.user.FavoritedRestaurants.some(f => f.id === r.id)
+        }))
+        const newdata = data.slice(0, 10)
+        console.log(newdata)
+        return res.render('top-restaurants', {
+          restaurants: newdata
         })
       })
       .catch(err => next(err))
